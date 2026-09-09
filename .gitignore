@@ -1,0 +1,28 @@
+# IDE / 编辑器
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 虚拟环境（体积大，禁止上传）
+.venv/
+venv/
+env/
+
+# 环境变量与密钥（防止误提交）
+.env
+.env.*
+*.pem
+*.key
+!*.example
+
+# 运行时生成
+*.log
+logs/
+
+# 操作系统
+.DS_Store
+Thumbs.db
