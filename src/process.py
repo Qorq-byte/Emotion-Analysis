@@ -1,46 +1,46 @@
-import os
-os.environ['PYTHONUSEV3'] = '0'
+import json
 
 import pandas as pd
-import torch
-import config
 from sklearn.model_selection import train_test_split
+
+import config
 from my_tokenizer import JiebaTokenizer
 
+
 def process():
-    # 读取原始数据
-    print('开始处理数据')
-    # 读取原始数据
-    df = pd.read_csv(config.RAW_DATA_DIR/'online_shopping_10_cats.csv',usecols=['label','review'],encoding='utf-8').dropna().sample(frac=0.1)
+    source = config.RAW_DATA_DIR / "online_shopping_10_cats.csv"
+    if not source.exists():
+        raise FileNotFoundError(f"缺少原始数据：{source}")
+    frame = pd.read_csv(source, usecols=["label", "review"], encoding="utf-8")
+    frame = frame.dropna(subset=["label", "review"])
+    frame = frame[frame["label"].isin([0, 1])].copy()
+    frame["review"] = frame["review"].astype(str).str.strip()
+    frame = frame[frame["review"].ne("")].drop_duplicates(subset=["review"])
+    if config.SAMPLE_FRACTION < 1:
+        frame, _ = train_test_split(
+            frame, train_size=config.SAMPLE_FRACTION, stratify=frame["label"],
+            random_state=config.SEED,
+        )
+    train, test = train_test_split(
+        frame, test_size=config.TEST_FRACTION, stratify=frame["label"],
+        random_state=config.SEED,
+    )
+    tokenizer = JiebaTokenizer.build_vocab(
+        train["review"], config.MODELS_DIR / "vocab.txt",
+        mode=config.TOKENIZER_MODE, min_freq=config.MIN_TOKEN_FREQ,
+        max_size=config.MAX_VOCAB_SIZE,
+    )
+    config.PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    for name, split in (("train", train), ("test", test)):
+        path = config.PROCESSED_DATA_DIR / f"{name}.jsonl"
+        with path.open("w", encoding="utf-8") as target:
+            for row in split.itertuples(index=False):
+                target.write(json.dumps({"review": tokenizer.encode(row.review, config.SEQ_LEN),
+                                         "label": int(row.label)}, ensure_ascii=False) + "\n")
+        print(f"{name}: {len(split)} 条 -> {path}")
+    print(f"词表大小: {tokenizer.vocab_size}; 切词形式: {tokenizer.mode}")
+    print("数据已更新，请重新训练；旧模型权重与新词表不兼容。")
 
-    #划分数据集
-    train_df,test_df=train_test_split(df,test_size=0.2,stratify=df['label'],random_state=42)
 
-    #构建词表      
-    JiebaTokenizer.build_vocab(train_df['review'].tolist(),config.MODELS_DIR/'vocab.txt')
-
-    # 从词表加载分词器
-    tokenizer = JiebaTokenizer.from_vocab(config.MODELS_DIR/'vocab.txt')
-
-    #计算序列长度
-    # print(train_df['review'].apply(lambda x:len(tokenizer.tokenizer(x))).quantile(0.95))
-
-    #构建训练集
-    train_df['review']=train_df['review'].apply(lambda x:tokenizer.encode(x,config.SEQ_LEN))
-
-    #保存训练集
-    train_df.to_json(config.PROCESSED_DATA_DIR/'train.jsonl',orient='records',lines=True)
-
-    #构建测试集
-    test_df['review']=test_df['review'].apply(lambda x:tokenizer.encode(x,config.SEQ_LEN))
-
-    #保存测试集
-    test_df.to_json(config.PROCESSED_DATA_DIR/'test.jsonl',orient='records',lines=True)
-
-    # 查看数据前五行
-    # print(df.head())
-
-    print('数据处理完成')
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     process()

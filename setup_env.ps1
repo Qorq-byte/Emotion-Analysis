@@ -1,13 +1,15 @@
-# 便捷激活虚拟环境脚本
-# 运行方法：在PowerShell中输入 .\setup_env.ps1
+$venvPython = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
+$activate = Join-Path $PSScriptRoot '.venv\Scripts\Activate.ps1'
 
-Write-Host "正在激活项目虚拟环境..." -ForegroundColor Green
+if (-not (Test-Path -LiteralPath $venvPython)) {
+    throw "未找到虚拟环境。请先运行: python -m venv .venv"
+}
 
-# 激活虚拟环境
-.venv\Scripts\Activate.ps1
+& $venvPython --version
+if ($LASTEXITCODE -ne 0) {
+    throw "虚拟环境指向无效的 Python。请重建 .venv 后运行: python -m pip install -r requirements.txt"
+}
 
-Write-Host "虚拟环境已激活!" -ForegroundColor Green
-Write-Host ""
-Write-Host "首次使用请运行: pip install -r requirements.txt" -ForegroundColor Yellow
-Write-Host ""
-Write-Host "运行程序示例: python src/process.py" -ForegroundColor Cyan
+. $activate
+Write-Host '虚拟环境已激活。' -ForegroundColor Green
+Write-Host '训练: python src/train.py | 评估: python src/evaluate.py | 预测: python src/predict.py' -ForegroundColor Cyan

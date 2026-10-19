@@ -1,30 +1,34 @@
-import os
-os.environ['PYTHONUSEV3'] = '0'
+import json
 
-import pandas as pd
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader, Dataset
+
 import config
 
 
-class ReviewAnanlyDataset(Dataset):
-    def __init__(self,path):
-        self.data=pd.read_json(path,lines= True,orient='records').to_dict(orient='records')
+class ReviewAnalysisDataset(Dataset):
+    def __init__(self, path=None, records=None):
+        if records is None:
+            with open(path, encoding="utf-8") as source:
+                records = [json.loads(line) for line in source if line.strip()]
+        if not records:
+            raise ValueError("数据集为空")
+        self.records = records
+
     def __len__(self):
-        return len(self.data)
+        return len(self.records)
+
     def __getitem__(self, index):
-        input_tensor=torch.tensor(self.data[index]['review'],dtype=torch.long)
-        target_tensor=torch.tensor(self.data[index]['label'],dtype=torch.float)
-        return input_tensor,target_tensor
+        item = self.records[index]
+        return (torch.tensor(item["review"], dtype=torch.long),
+                torch.tensor(item["label"], dtype=torch.float32))
 
 
-#提供一个获取dataloader的方法
-def get_dataloader(train= True):
-    path=config.PROCESSED_DATA_DIR/('train.jsonl' if train else 'test.jsonl')
-    dataset=ReviewAnanlyDataset( path)
-    return DataLoader(dataset,batch_size=config.BATCH_SIZE,shuffle=True)
+ReviewAnanlyDataset = ReviewAnalysisDataset
 
 
-if __name__=='__main__':
-    dataloader=get_dataloader()
-    print(len(dataloader))
+def get_dataloader(train=True, records=None, shuffle=None):
+    path = config.PROCESSED_DATA_DIR / ("train.jsonl" if train else "test.jsonl")
+    dataset = ReviewAnalysisDataset(path=path if records is None else None, records=records)
+    return DataLoader(dataset, batch_size=config.BATCH_SIZE,
+                      shuffle=train if shuffle is None else shuffle)
